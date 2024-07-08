@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+
+    environment {
+        // Define environment variables for Docker Hub credentials
+        DOCKER_HUB_USERNAME = credentials('docker-hub-username')
+        DOCKER_HUB_PASSWORD = credentials('docker-hub-password')
+        
+        // Define the image name and tag
+        IMAGE_NAME = 'angular-app'
+        IMAGE_TAG = "${env.BUILD_NUMBER}" // You can customize the tag as needed
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Checkout the code from your version control system (e.g., Git)
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                // Install npm dependencies and build Angular app
+                sh 'npm install'
+                sh 'npm run build --prod'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                // Build Docker image
+                script {
+                    dockerImage = docker.build("${DOCKER_HUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}", ".")
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                // Push Docker image to Docker Hub
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
+                        dockerImage.push()
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            // Cleanup steps if needed
+            echo 'Build and Push to Docker Hub succeeded!'
+        }
+        failure {
+            // Cleanup steps if needed
+            echo 'Build or Push to Docker Hub failed!'
+        }
+    }
+}
